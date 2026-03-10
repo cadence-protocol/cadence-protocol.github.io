@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadence Protocol — The Onchain Subscription Infrastructure</title>
+  <meta name="description" content="The open ERC standard and automation layer for recurring onchain payments. Pull payments, full state management, cross-chain — without intermediaries." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080D1A;
+      --bg2:       #0D1526;
+      --bg3:       #111D35;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(99,179,237,0.2);
+      --navy:      #1B2A4A;
+      --blue:      #2563EB;
+      --blue-l:    #3B82F6;
+      --blue-ll:   #60A5FA;
+      --blue-lll:  #93C5FD;
+      --text:      #F0F4FF;
+      --text2:     #94A3B8;
+      --text3:     #64748B;
+      --glow:      rgba(37,99,235,0.15);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE TEXTURE OVERLAY ─────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── GLOW ORBS ─────────────────────────────────────── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb-1 { width: 600px; height: 600px; background: rgba(37,99,235,0.12); top: -200px; right: -100px; }
+    .orb-2 { width: 400px; height: 400px; background: rgba(99,102,241,0.08); bottom: 200px; left: -100px; }
+
+    /* ── LAYOUT ────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+    /* ── NAV ───────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 0 24px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(8,13,26,0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .logo img { height: 64px; display: block; filter: drop-shadow(0 0 10px rgba(37,99,235,0.4)); transition: filter 0.3s; }
+    nav .logo img:hover { filter: drop-shadow(0 0 18px rgba(59,130,246,0.7)); }
+    nav .nav-right { display: flex; align-items: center; gap: 24px; }
+    nav .nav-links { display: flex; gap: 28px; }
+    nav .nav-links a {
+      color: var(--text2);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav .nav-links a:hover { color: var(--text); }
+    .nav-socials { display: flex; gap: 16px; align-items: center; }
+    .nav-socials a {
+      color: var(--text3);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s;
+    }
+    .nav-socials a:hover { color: var(--blue-ll); }
+    .nav-socials svg { width: 18px; height: 18px; fill: currentColor; }
+    .btn-nav {
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 0.01em;
+    }
+    .btn-nav:hover { background: var(--blue-l); transform: translateY(-1px); }
+
+    /* ── HERO ──────────────────────────────────────────── */
+    .hero {
+      padding: 172px 0 100px;
+      text-align: center;
+      position: relative;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(37,99,235,0.12);
+      border: 1px solid rgba(37,99,235,0.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--blue-ll);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+    .hero-badge span { width: 6px; height: 6px; background: var(--blue-ll); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+    .hero h1 {
+      font-size: clamp(42px, 6vw, 72px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+      background: linear-gradient(90deg, #F0F4FF 0%, #60A5FA 35%, #818CF8 60%, #F0F4FF 100%);
+      background-size: 300% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: fade-up 0.8s ease 0.25s both, gradient-shift 7s ease-in-out 1s infinite;
+    }
+    .hero p {
+      font-size: clamp(17px, 2vw, 20px);
+      color: var(--text2);
+      max-width: 640px;
+      margin: 0 auto 48px;
+      line-height: 1.7;
+      font-weight: 400;
+    }
+    .hero-cta {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 72px;
+    }
+    .btn-primary {
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      box-shadow: 0 0 32px rgba(37,99,235,0.3);
+    }
+    .btn-primary:hover { background: var(--blue-l); transform: translateY(-2px); box-shadow: 0 0 48px rgba(37,99,235,0.4); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--border2); color: var(--text); }
+
+    /* ── WAITLIST FORM ─────────────────────────────────── */
+    .waitlist-form {
+      display: flex;
+      gap: 8px;
+      max-width: 460px;
+      margin: 0 auto 28px;
+    }
+    .waitlist-form input {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px 18px;
+      font-size: 14px;
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .waitlist-form input::placeholder { color: var(--text3); }
+    .waitlist-form input:focus { border-color: var(--blue); }
+    .waitlist-form button {
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 13px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+      font-family: inherit;
+    }
+    .waitlist-form button:hover { background: var(--blue-l); }
+    .waitlist-note { font-size: 12px; color: var(--text3); }
+
+    /* ── CHAIN LOGOS ───────────────────────────────────── */
+    .chain-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chain-bar span { font-size: 12px; color: var(--text3); margin-right: 8px; }
+    .chain-pill {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text2);
+    }
+
+    /* ── SECTION HEADERS ───────────────────────────────── */
+    .section { padding: 96px 0; }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--blue-ll);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::before { content: ''; display: block; width: 24px; height: 1px; background: var(--blue-ll); }
+    .section-title {
+      font-size: clamp(30px, 4vw, 44px);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+      margin-bottom: 20px;
+    }
+    .section-sub {
+      font-size: 18px;
+      color: var(--text2);
+      max-width: 580px;
+      line-height: 1.7;
+    }
+
+    /* ── PROBLEM SECTION ───────────────────────────────── */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 56px;
+    }
+    .problem-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .problem-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(239,68,68,0.4), transparent);
+    }
+    .problem-card .card-tag {
+      display: inline-block;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: #FCA5A5;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 100px;
+      margin-bottom: 20px;
+    }
+    .problem-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+    .problem-card p { color: var(--text2); font-size: 14px; line-height: 1.7; }
+
+    /* ── SOLUTION PILLARS ──────────────────────────────── */
+    .pillars {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 56px;
+    }
+    .pillar {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .pillar:hover { border-color: var(--border2); transform: translateY(-4px); }
+    .pillar::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--blue), transparent);
+    }
+    .pillar-icon {
+      width: 48px; height: 48px;
+      background: rgba(37,99,235,0.12);
+      border: 1px solid rgba(37,99,235,0.2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 22px;
+    }
+    .pillar h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .pillar .pillar-sub { font-size: 12px; color: var(--blue-ll); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 12px; }
+    .pillar p { color: var(--text2); font-size: 14px; line-height: 1.7; }
+
+    /* ── DEEP DIVE ─────────────────────────────────────── */
+    .deep-dive { margin-top: 56px; display: flex; flex-direction: column; gap: 16px; }
+
+    .deep-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .deep-card.reverse { direction: rtl; }
+    .deep-card.reverse > * { direction: ltr; }
+
+    .deep-text {
+      padding: 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .deep-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--blue-ll);
+      margin-bottom: 20px;
+    }
+    .deep-label .dot { width: 6px; height: 6px; background: var(--blue-ll); border-radius: 50%; }
+    .deep-text h3 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 16px; }
+    .deep-text p { color: var(--text2); font-size: 15px; line-height: 1.75; margin-bottom: 24px; }
+    .feature-list { display: flex; flex-direction: column; gap: 10px; }
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text2);
+    }
+    .feature-item::before {
+      content: '';
+      display: block;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--blue-ll);
+      margin-top: 7px;
+      flex-shrink: 0;
+    }
+
+    .deep-visual {
+      background: var(--bg3);
+      border-left: 1px solid var(--border);
+      padding: 40px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    .deep-card.reverse .deep-visual { border-left: none; border-right: 1px solid var(--border); }
+    .code-line { display: flex; gap: 12px; align-items: flex-start; }
+    .code-kw  { color: #818CF8; }
+    .code-fn  { color: #60A5FA; }
+    .code-str { color: #86EFAC; }
+    .code-cm  { color: var(--text3); }
+    .code-ty  { color: #FCD34D; }
+    .code-num { color: #F9A8D4; }
+    .code-ind { padding-left: 20px; }
+
+    /* ── DUNNING FLOW ──────────────────────────────────── */
+    .dunning-flow { display: flex; flex-direction: column; gap: 0; }
+    .dunning-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .dunning-step:last-child { border-bottom: none; }
+    .dunning-day {
+      width: 56px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--blue-ll);
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .dunning-action { font-size: 13px; color: var(--text2); line-height: 1.5; }
+    .dunning-action strong { color: var(--text); font-weight: 600; }
+
+    /* ── USE CASES ─────────────────────────────────────── */
+    .use-cases-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 56px;
+    }
+    .use-case {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: border-color 0.3s;
+    }
+    .use-case:hover { border-color: var(--border2); }
+    .use-case-icon { font-size: 28px; margin-bottom: 16px; }
+    .use-case h4 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .use-case p { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+    /* ── COMPARISON TABLE ──────────────────────────────── */
+    .compare-table {
+      margin-top: 56px;
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .compare-table th {
+      background: var(--bg2);
+      padding: 16px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      color: var(--text2);
+    }
+    .compare-table th.highlight {
+      color: var(--blue-ll);
+      background: rgba(37,99,235,0.10);
+      border-bottom-color: rgba(37,99,235,0.25);
+    }
+    .compare-table td {
+      padding: 14px 20px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+    }
+    .compare-table td.highlight {
+      color: var(--text);
+      font-weight: 600;
+      background: rgba(37,99,235,0.06);
+      border-left: 1px solid rgba(37,99,235,0.15);
+      border-right: 1px solid rgba(37,99,235,0.15);
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .tick  { color: #4ADE80; }
+    .cross { color: #F87171; background: rgba(248,113,113,0.06); }
+    .partial { color: #FCD34D; background: rgba(252,211,77,0.06); }
+    .compare-table td.tick.highlight {
+      color: #4ADE80;
+      background: rgba(74,222,128,0.08);
+      border-left: 1px solid rgba(74,222,128,0.15);
+      border-right: 1px solid rgba(74,222,128,0.15);
+    }
+
+    /* ── TIMELINE ──────────────────────────────────────── */
+    .timeline {
+      margin-top: 56px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .timeline-item {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      position: relative;
+    }
+    .timeline-item.active { border-color: var(--blue); }
+    .timeline-item.active::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--blue), var(--blue-ll));
+    }
+    .tl-period {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text3);
+      margin-bottom: 12px;
+    }
+    .timeline-item.active .tl-period { color: var(--blue-ll); }
+    .tl-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+    .tl-items { display: flex; flex-direction: column; gap: 8px; }
+    .tl-item { font-size: 13px; color: var(--text2); display: flex; gap: 8px; align-items: flex-start; }
+    .tl-item::before { content: '→'; color: var(--blue-ll); flex-shrink: 0; }
+    .tl-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 100px;
+      margin-bottom: 8px;
+    }
+    .tl-badge.now { background: rgba(37,99,235,0.15); color: var(--blue-ll); border: 1px solid rgba(37,99,235,0.3); }
+    .tl-badge.soon { background: rgba(250,204,21,0.1); color: #FCD34D; border: 1px solid rgba(250,204,21,0.2); }
+    .tl-badge.later { background: rgba(100,116,139,0.1); color: var(--text3); border: 1px solid var(--border); }
+
+    /* ── STATS BAR ─────────────────────────────────────── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-top: 56px;
+    }
+    .stat {
+      background: var(--bg2);
+      padding: 32px 28px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #F0F4FF, #60A5FA);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-label { font-size: 13px; color: var(--text3); }
+
+    /* ── FOOTER ────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 48px 0;
+      position: relative;
+      z-index: 1;
+    }
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .footer-logo img { height: 56px; opacity: 0.75; }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { font-size: 13px; color: var(--text3); text-decoration: none; transition: color 0.2s; }
+    .footer-links a:hover { color: var(--text2); }
+    .footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .footer-ens {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--blue-ll);
+      background: rgba(37,99,235,0.08);
+      border: 1px solid rgba(37,99,235,0.15);
+      padding: 4px 12px;
+      border-radius: 100px;
+    }
+    .footer-copy { font-size: 12px; color: var(--text3); }
+    .footer-socials { display: flex; gap: 16px; margin-top: 4px; }
+    .footer-socials a { color: var(--text3); text-decoration: none; transition: color 0.2s; }
+    .footer-socials a:hover { color: var(--blue-ll); }
+    .footer-socials svg { width: 16px; height: 16px; fill: currentColor; }
+
+    /* ── TOKEN BAR ─────────────────────────────────────── */
+    .token-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 48px;
+    }
+    .token-bar-label { font-size: 12px; color: var(--text3); margin-right: 4px; }
+    .token-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 16px 6px 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .token-pill.featured {
+      border-color: rgba(38,217,140,0.3);
+      background: rgba(38,217,140,0.06);
+      color: var(--text);
+    }
+    .token-pill .token-dot {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 800;
+    }
+    .token-pill .recommended {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+      color: #4ADE80; margin-left: 4px;
+    }
+
+    /* ── WHY NOW ────────────────────────────────────────── */
+    .why-now-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 56px;
+    }
+    .why-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .why-card:hover { border-color: var(--border2); transform: translateY(-4px); }
+    .why-year {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--blue-ll); margin-bottom: 12px;
+    }
+    .why-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .why-card p { font-size: 13px; color: var(--text2); line-height: 1.65; }
+
+    /* ── VOLUME FLOW ────────────────────────────────────── */
+    .flow-wrap {
+      margin-top: 56px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px;
+    }
+    .flow-title { font-size: 13px; font-weight: 600; color: var(--text3); text-align: center; margin-bottom: 40px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .flow-steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+    .flow-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      min-width: 120px;
+    }
+    .flow-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .flow-icon.highlight {
+      background: rgba(37,99,235,0.12);
+      border-color: rgba(37,99,235,0.3);
+    }
+    .flow-step-label { font-size: 12px; font-weight: 600; color: var(--text2); text-align: center; }
+    .flow-step-sub { font-size: 11px; color: var(--text3); text-align: center; }
+    .flow-arrow {
+      font-size: 20px;
+      color: var(--blue-ll);
+      opacity: 0.5;
+      padding: 0 8px;
+      margin-bottom: 20px;
+    }
+    .flow-bottom {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-top: 40px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .flow-metric { text-align: center; }
+    .flow-metric-value {
+      font-size: 28px; font-weight: 800; letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #F0F4FF, #60A5FA);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .flow-metric-label { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+    /* ── PARTNERS CTA ───────────────────────────────────── */
+    .partners-section {
+      background: linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(99,102,241,0.06) 100%);
+      border: 1px solid rgba(37,99,235,0.2);
+      border-radius: 24px;
+      padding: 64px 48px;
+      text-align: center;
+      margin-top: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .partners-section::before {
+      content: '';
+      position: absolute;
+      top: -60px; left: 50%; transform: translateX(-50%);
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .partners-section h2 { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 16px; }
+    .partners-section p { font-size: 17px; color: var(--text2); max-width: 540px; margin: 0 auto 36px; line-height: 1.7; }
+    .partners-ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+
+    /* ── DIVIDER ───────────────────────────────────────── */
+    .section-divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 0;
+    }
+
+    /* ── HERO CANVAS ────────────────────────────────────── */
+    #hero-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── HERO LOGO ──────────────────────────────────────── */
+    .hero-logo-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 48px;
+      animation: fade-up 0.8s ease 0s both;
+    }
+    .hero-logo-img {
+      height: 220px;
+      width: auto;
+      filter: drop-shadow(0 0 40px rgba(37,99,235,0.5)) drop-shadow(0 0 80px rgba(99,102,241,0.2));
+      animation: hero-logo-glow 4s ease-in-out infinite;
+    }
+    @keyframes hero-logo-glow {
+      0%, 100% { filter: drop-shadow(0 0 32px rgba(37,99,235,0.45)) drop-shadow(0 0 64px rgba(99,102,241,0.15)); }
+      50%       { filter: drop-shadow(0 0 56px rgba(59,130,246,0.65)) drop-shadow(0 0 100px rgba(129,140,248,0.3)); }
+    }
+
+    /* ── ANIMATIONS ────────────────────────────────────── */
+
+    /* Gradient shift for hero title */
+    @keyframes gradient-shift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Entrance fade-up */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Floating orbs */
+    @keyframes float-orb {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50%       { transform: translateY(-40px) scale(1.06); }
+    }
+    .orb-1 { animation: float-orb 14s ease-in-out infinite; }
+    .orb-2 { animation: float-orb 18s ease-in-out infinite reverse; }
+
+    /* Hero staggered entrance */
+    .logo        { animation: fade-up 0.6s ease 0.05s both; }
+    .hero-badge  { animation: fade-up 0.7s ease 0.1s  both; }
+    .hero p      { animation: fade-up 0.7s ease 0.4s  both; }
+    .waitlist-form { animation: fade-up 0.7s ease 0.55s both; }
+    .waitlist-note { animation: fade-up 0.6s ease 0.65s both; }
+    .chain-bar   { animation: fade-up 0.6s ease 0.75s both; }
+
+    /* Scroll reveal */
+    .reveal {
+      opacity: 0;
+      transform: translateY(36px);
+      transition: opacity 0.75s ease, transform 0.75s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+
+    /* Enhanced card hovers */
+    .pillar {
+      transition: border-color 0.3s, transform 0.35s, box-shadow 0.35s;
+    }
+    .pillar:hover {
+      border-color: var(--border2);
+      transform: translateY(-6px);
+      box-shadow: 0 24px 60px rgba(37,99,235,0.14);
+    }
+    .use-case {
+      transition: border-color 0.3s, transform 0.35s, box-shadow 0.35s;
+    }
+    .use-case:hover {
+      border-color: var(--border2);
+      transform: translateY(-5px);
+      box-shadow: 0 16px 48px rgba(37,99,235,0.12);
+    }
+    .problem-card {
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .problem-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    }
+    .timeline-item {
+      transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    }
+    .timeline-item:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+    }
+
+    /* Nav scroll state */
+    nav.scrolled {
+      background: rgba(8,13,26,0.92);
+      border-bottom-color: rgba(37,99,235,0.2);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    /* ── RESPONSIVE ────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .pillars { grid-template-columns: 1fr; }
+      .problem-grid { grid-template-columns: 1fr; }
+      .use-cases-grid { grid-template-columns: 1fr 1fr; }
+      .timeline { grid-template-columns: 1fr; }
+      .stats-bar { grid-template-columns: 1fr 1fr; }
+      .deep-card { grid-template-columns: 1fr; }
+      .deep-card.reverse { direction: ltr; }
+      .why-now-grid { grid-template-columns: 1fr 1fr; }
+      .flow-steps { gap: 4px; }
+      .flow-bottom { gap: 20px; }
+      .partners-section { padding: 40px 24px; }
+      nav .nav-links { display: none; }
+      .footer-inner { flex-direction: column; align-items: flex-start; }
+      .footer-right { align-items: flex-start; }
+    }
+    @media (max-width: 540px) {
+      .why-now-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .use-cases-grid { grid-template-columns: 1fr; }
+      .waitlist-form { flex-direction: column; }
+      .hero-cta { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<!-- ═══════════════════ NAV ═══════════════════ -->
+<nav>
+  <div class="logo">
+    <img src="logo/cadence_logo_white_hor.png" alt="Cadence Protocol" />
+  </div>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#problem">Problem</a>
+      <a href="#infrastructure">Infrastructure</a>
+      <a href="#usecases">Use Cases</a>
+      <a href="#partners">Partners</a>
+      <a href="#roadmap">Roadmap</a>
+    </div>
+    <div class="nav-socials">
+      <!-- GitHub -->
+      <a href="#" title="GitHub">
+        <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+      </a>
+      <!-- Twitter/X -->
+      <a href="#" title="X / Twitter">
+        <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      </a>
+      <!-- Farcaster -->
+      <a href="#" title="Farcaster">
+        <svg viewBox="0 0 24 24"><path d="M11.543 0h.914C17.95 0 22 4.05 22 9.543v4.914C22 19.95 17.95 24 12.457 24h-.914C6.05 24 2 19.95 2 14.457V9.543C2 4.05 6.05 0 11.543 0ZM8 6l4 6 4-6h-2l-2 3-2-3H8Zm-1 7v5h2v-4h6v4h2v-5H7Z"/></svg>
+      </a>
+      <!-- Discord -->
+      <a href="#" title="Discord">
+        <svg viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+      </a>
+    </div>
+    <a href="#waitlist" class="btn-nav">Get Early Access</a>
+  </div>
+</nav>
+
+<!-- ═══════════════════ HERO ═══════════════════ -->
+<section class="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="container">
+    <div class="hero-logo-wrap">
+      <img src="logo/cadence_logo_white_ver.png" alt="Cadence Protocol" class="hero-logo-img" />
+    </div>
+    <div class="hero-badge">
+      <span></span>
+      Building the ERC Standard for Onchain Subscriptions
+    </div>
+    <h1>The Onchain Subscription<br/>Infrastructure</h1>
+    <p>An open ERC standard and full automation layer for recurring payments on Ethereum and EVM chains — pull payments, full state management, cross-chain — without intermediaries.</p>
+
+    <div id="waitlist" class="waitlist-form">
+      <input type="email" placeholder="your@email.com" />
+      <button>Notify me</button>
+    </div>
+    <p class="waitlist-note">No spam. Early access updates only.</p>
+
+    <div style="margin-top: 40px;">
+      <div class="chain-bar">
+        <span>Launching on</span>
+        <span class="chain-pill">Ethereum</span>
+        <span class="chain-pill">Base</span>
+        <span class="chain-pill">Arbitrum</span>
+        <span class="chain-pill">Optimism</span>
+        <span class="chain-pill">Polygon</span>
+      </div>
+    </div>
+
+    <div class="token-bar" style="margin-top: 20px;">
+      <span class="token-bar-label">Accepted tokens</span>
+      <div class="token-pill featured">
+        <span class="token-dot" style="background:#26A17B;color:white;">₮</span>
+        USDT
+        <span class="recommended">RECOMMENDED</span>
+      </div>
+      <div class="token-pill">
+        <span class="token-dot" style="background:#2775CA;color:white;font-size:9px;">USDC</span>
+        USDC
+      </div>
+      <div class="token-pill">
+        <span class="token-dot" style="background:#627EEA;color:white;font-size:9px;">ETH</span>
+        ETH
+      </div>
+      <div class="token-pill">
+        <span class="token-dot" style="background:#F5AC37;color:white;font-size:9px;">DAI</span>
+        DAI
+      </div>
+      <div class="token-pill">
+        <span class="token-dot" style="background:#475569;color:#94A3B8;font-size:9px;">ANY</span>
+        Any ERC-20
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ STATS ═══════════════════ -->
+<section class="section" style="padding: 72px 0;">
+  <div class="container">
+    <div class="stats-bar reveal">
+      <div class="stat">
+        <div class="stat-value">$650B+</div>
+        <div class="stat-label">Annual subscription revenue in the digital economy — none of it onchain. Yet.</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">ERC</div>
+        <div class="stat-label">Open standard — no vendor lock-in</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">5+</div>
+        <div class="stat-label">EVM chains at launch via CREATE2</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0.25%</div>
+        <div class="stat-label">Protocol fee per collected payment</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ PROBLEM ═══════════════════ -->
+<section class="section" id="problem">
+  <div class="container">
+    <div class="section-label">The Problem</div>
+    <h2 class="section-title">Recurring payments onchain<br/>don't exist. Yet.</h2>
+    <p class="section-sub">Two previous attempts to standardize onchain subscriptions have failed. Cadence is built to fix that — permanently.</p>
+
+    <div class="problem-grid reveal">
+      <div class="problem-card">
+        <div class="card-tag">ERC-1337 — Abandoned 2018</div>
+        <h3>Meta-transaction dependency</h3>
+        <p>Required offchain relayers to execute payments, introducing centralization, trust assumptions, and a single point of failure. No test cases were ever written. The proposal stagnated and was never finalized.</p>
+      </div>
+      <div class="problem-card">
+        <div class="card-tag">ERC-5643 — Too narrow</div>
+        <h3>NFT-only scope</h3>
+        <p>Built exclusively for NFT-based memberships. No pull payment mechanism, no state management (pause, grace period, retry), and no support for commercial SaaS-style subscriptions. A partial solution to a much bigger problem.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;" class="reveal reveal-delay-1">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>ERC-1337</th>
+            <th>ERC-5643</th>
+            <th class="highlight">Cadence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Native pull payments</td>
+            <td class="cross">✗ Requires relay</td>
+            <td class="cross">✗ None</td>
+            <td class="tick highlight">✓ Fully onchain</td>
+          </tr>
+          <tr>
+            <td>State management</td>
+            <td class="cross">✗ None</td>
+            <td class="partial">△ Basic</td>
+            <td class="tick highlight">✓ Active / Paused / Cancelled / Expired / PastDue</td>
+          </tr>
+          <tr>
+            <td>ETH + ERC-20 support</td>
+            <td class="partial">△ Partial</td>
+            <td class="cross">✗ None</td>
+            <td class="tick highlight">✓ Currency-agnostic</td>
+          </tr>
+          <tr>
+            <td>Cross-chain payments</td>
+            <td class="cross">✗ None</td>
+            <td class="cross">✗ None</td>
+            <td class="tick highlight">✓ ERC-7683 intents</td>
+          </tr>
+          <tr>
+            <td>Grace period & dunning</td>
+            <td class="cross">✗ None</td>
+            <td class="cross">✗ None</td>
+            <td class="tick highlight">✓ Configurable per merchant</td>
+          </tr>
+          <tr>
+            <td>Automation layer</td>
+            <td class="cross">✗ None</td>
+            <td class="cross">✗ None</td>
+            <td class="tick highlight">✓ Keeper + Gelato fallback</td>
+          </tr>
+          <tr>
+            <td>Status</td>
+            <td class="cross">Stagnant</td>
+            <td class="partial">Final (limited)</td>
+            <td class="tick highlight">In development</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ SOLUTION ═══════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">The Solution</div>
+    <h2 class="section-title">Three layers. One standard.</h2>
+    <p class="section-sub">Cadence is not just a smart contract. It's a complete stack — an open standard, an automation service, and a developer toolkit.</p>
+
+    <div class="pillars reveal">
+      <div class="pillar">
+        <div class="pillar-icon">⬡</div>
+        <div class="pillar-sub">Layer 1</div>
+        <h3>ERC Standard</h3>
+        <p>An open Solidity interface for onchain subscriptions. Deployable by anyone, auditable by everyone. Becomes the shared standard the ecosystem builds on — like ERC-20 for tokens.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">⚡</div>
+        <div class="pillar-sub">Layer 2</div>
+        <h3>Automation Service</h3>
+        <p>The keeper layer that actually executes payments. Indexer, scheduler, executor, dunning manager, webhooks — all managed so merchants don't have to run their own infrastructure.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon">⌨</div>
+        <div class="pillar-sub">Layer 3</div>
+        <h3>SDK & Tooling</h3>
+        <p>TypeScript SDK, React hooks, CLI, subgraph, Foundry snippets. Drop-in integration for any EVM project. Built to match the DX expectations of modern developer tooling.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ DEEP DIVE ═══════════════════ -->
+<section class="section" id="infrastructure">
+  <div class="container">
+    <div class="section-label">Infrastructure</div>
+    <h2 class="section-title">Built for the long run.</h2>
+    <p class="section-sub">Every layer of Cadence is designed to be composable, permissionless, and production-grade.</p>
+
+    <div class="deep-dive">
+
+      <!-- ERC STANDARD -->
+      <div class="deep-card reveal">
+        <div class="deep-text">
+          <div class="deep-label"><span class="dot"></span> ERC Standard</div>
+          <h3>ISubscription</h3>
+          <p>The core interface defines everything a subscription needs: who pays, how much, how often, and what happens when payment fails. Fully compatible with ERC-20, ERC-165, and ERC-7683 for cross-chain intents.</p>
+          <div class="feature-list">
+            <div class="feature-item">Subscribe, cancel, pause, resume — all from the subscriber's wallet</div>
+            <div class="feature-item">Pull collectPayment() callable by authorized keepers only</div>
+            <div class="feature-item">Optional extensions: Trial, Tiered plans, Discovery registry, Custom hooks</div>
+            <div class="feature-item">Deployed at the same address on all EVM chains via CREATE2</div>
+            <div class="feature-item">Reference implementation: Foundry, >95% test coverage</div>
+          </div>
+        </div>
+        <div class="deep-visual">
+          <div class="code-line"><span class="code-kw">interface</span> <span class="code-ty">ISubscription</span> <span style="color:var(--text3)">{</span></div>
+          <div class="code-line code-ind"><span class="code-kw">struct</span> <span class="code-ty">Terms</span> <span style="color:var(--text3)">{</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-ty">address</span> <span class="code-fn">token</span><span style="color:var(--text3)">;</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-ty">uint256</span> <span class="code-fn">amount</span><span style="color:var(--text3)">;</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-ty">uint48</span> &nbsp;<span class="code-fn">interval</span><span style="color:var(--text3)">;</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-ty">uint48</span> &nbsp;<span class="code-fn">trialPeriod</span><span style="color:var(--text3)">;</span></div>
+          <div class="code-line code-ind"><span style="color:var(--text3)">}</span></div>
+          <div style="height:8px"></div>
+          <div class="code-line code-ind"><span class="code-kw">enum</span> <span class="code-ty">Status</span> <span style="color:var(--text3)">{</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-str">Active</span><span style="color:var(--text3)">, </span><span class="code-str">Paused</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-str">Cancelled</span><span style="color:var(--text3)">, </span><span class="code-str">Expired</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-str">PastDue</span></div>
+          <div class="code-line code-ind"><span style="color:var(--text3)">}</span></div>
+          <div style="height:8px"></div>
+          <div class="code-line code-ind"><span class="code-kw">function</span> <span class="code-fn">subscribe</span><span style="color:var(--text3)">(</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-ty">address</span> merchant<span style="color:var(--text3)">,</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-ty">Terms</span> calldata terms</div>
+          <div class="code-line code-ind"><span style="color:var(--text3)">) external returns (</span><span class="code-ty">bytes32</span><span style="color:var(--text3)">);</span></div>
+          <div style="height:8px"></div>
+          <div class="code-line code-ind"><span class="code-kw">function</span> <span class="code-fn">collectPayment</span><span style="color:var(--text3)">(</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-ty">bytes32</span> subId</div>
+          <div class="code-line code-ind"><span style="color:var(--text3)">) external returns (</span><span class="code-ty">bool</span><span style="color:var(--text3)">);</span></div>
+          <div class="code-line"><span style="color:var(--text3)">}</span></div>
+        </div>
+      </div>
+
+      <!-- AUTOMATION SERVICE -->
+      <div class="deep-card reverse reveal">
+        <div class="deep-text">
+          <div class="deep-label"><span class="dot"></span> Automation Service</div>
+          <h3>The Keeper Layer</h3>
+          <p>A production-grade service that handles execution so merchants never have to. From indexing onchain events to dunning management — everything runs automatically.</p>
+          <div class="feature-list">
+            <div class="feature-item">Indexer: The Graph subgraph + Node.js custom indexer for real-time sync</div>
+            <div class="feature-item">Scheduler: Redis priority queue, polls every 60s, checks subscriber balance before execution</div>
+            <div class="feature-item">Executor: gas-optimized, batched transactions, Gelato Network as decentralized fallback</div>
+            <div class="feature-item">Dunning manager: configurable grace period + retry logic per merchant</div>
+            <div class="feature-item">Webhooks: Stripe-compatible HTTP notifications with HMAC signature verification</div>
+            <div class="feature-item">Merchant dashboard: MRR, ARR, churn rate, subscriber list, analytics</div>
+          </div>
+        </div>
+        <div class="deep-visual">
+          <div class="code-line"><span class="code-cm">// Dunning flow (configurable)</span></div>
+          <div style="height:8px"></div>
+          <div class="dunning-flow">
+            <div class="dunning-step">
+              <div class="dunning-day">Day 0</div>
+              <div class="dunning-action"><strong>Payment fails</strong> → notify subscriber, status → PastDue</div>
+            </div>
+            <div class="dunning-step">
+              <div class="dunning-day">Day 3</div>
+              <div class="dunning-action"><strong>Retry attempt 1</strong> → second notification sent</div>
+            </div>
+            <div class="dunning-step">
+              <div class="dunning-day">Day 5</div>
+              <div class="dunning-action"><strong>Retry attempt 2</strong> → urgent notification</div>
+            </div>
+            <div class="dunning-step">
+              <div class="dunning-day">Day 7</div>
+              <div class="dunning-action"><strong>Grace period ends</strong> → cancelSubscription() onchain</div>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+          <div class="code-line"><span class="code-cm">// Webhook payload (Stripe-compatible)</span></div>
+          <div style="height:6px"></div>
+          <div class="code-line"><span style="color:var(--text3)">{</span></div>
+          <div class="code-line code-ind"><span class="code-fn">"type"</span><span style="color:var(--text3)">: </span><span class="code-str">"payment.collected"</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line code-ind"><span class="code-fn">"data"</span><span style="color:var(--text3)">: {</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-fn">"subId"</span><span style="color:var(--text3)">: </span><span class="code-str">"0xabc..."</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-fn">"amount"</span><span style="color:var(--text3)">: </span><span class="code-num">49000000</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line" style="padding-left:40px"><span class="code-fn">"token"</span><span style="color:var(--text3)">: </span><span class="code-str">"USDT"</span></div>
+          <div class="code-line code-ind"><span style="color:var(--text3)">}</span></div>
+          <div class="code-line"><span style="color:var(--text3)">}</span></div>
+        </div>
+      </div>
+
+      <!-- SDK & TOOLING -->
+      <div class="deep-card reveal">
+        <div class="deep-text">
+          <div class="deep-label"><span class="dot"></span> SDK & Tooling</div>
+          <h3>Built for developers.</h3>
+          <p>From npm to CLI, Cadence is designed to integrate in minutes, not days. The same experience developers expect from Stripe or Alchemy — but fully onchain.</p>
+          <div class="feature-list">
+            <div class="feature-item"><code style="font-family:monospace;color:var(--blue-ll)">@cadenceprotocol/sdk</code> — TypeScript SDK with viem/wagmi wrappers and React hooks</div>
+            <div class="feature-item"><code style="font-family:monospace;color:var(--blue-ll)">@cadenceprotocol/cli</code> — deploy, manage, and inspect subscriptions from the terminal</div>
+            <div class="feature-item">Public subgraph on The Graph — query any subscription or payment history</div>
+            <div class="feature-item">OpenZeppelin-style base contract — drop into any Foundry or Hardhat project</div>
+            <div class="feature-item">Merchant API with key management, rate limiting, and webhook configuration</div>
+          </div>
+        </div>
+        <div class="deep-visual">
+          <div class="code-line"><span class="code-kw">import</span> <span style="color:var(--text3)">{</span> <span class="code-fn">useSubscription</span> <span style="color:var(--text3)">}</span></div>
+          <div class="code-line"><span class="code-kw">&nbsp; from</span> <span class="code-str">'@cadenceprotocol/sdk'</span><span style="color:var(--text3)">;</span></div>
+          <div style="height:10px"></div>
+          <div class="code-line"><span class="code-kw">const</span> <span style="color:var(--text3)">{</span> <span class="code-fn">subscribe</span><span style="color:var(--text3)">, </span><span class="code-fn">status</span> <span style="color:var(--text3)">} =</span></div>
+          <div class="code-line"><span class="code-fn">&nbsp; useSubscription</span><span style="color:var(--text3)">(</span><span class="code-str">'0xMerchant...'</span><span style="color:var(--text3)">);</span></div>
+          <div style="height:10px"></div>
+          <div class="code-line"><span class="code-cm">// Subscribe in one call</span></div>
+          <div class="code-line"><span class="code-kw">await</span> <span class="code-fn">subscribe</span><span style="color:var(--text3)">({</span></div>
+          <div class="code-line code-ind"><span class="code-fn">token</span><span style="color:var(--text3)">: </span><span class="code-str">USDC</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line code-ind"><span class="code-fn">amount</span><span style="color:var(--text3)">: </span><span class="code-num">49_000_000</span><span style="color:var(--text3)">, </span><span class="code-cm">// $49</span></div>
+          <div class="code-line code-ind"><span class="code-fn">interval</span><span style="color:var(--text3)">: </span><span class="code-str">'monthly'</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line code-ind"><span class="code-fn">trial</span><span style="color:var(--text3)">: </span><span class="code-str">'14d'</span><span style="color:var(--text3)">,</span></div>
+          <div class="code-line"><span style="color:var(--text3)">});</span></div>
+          <div style="height:10px"></div>
+          <div class="code-line"><span class="code-cm">// Status is reactive</span></div>
+          <div class="code-line"><span class="code-fn">status</span><span style="color:var(--text3)">; </span><span class="code-cm">// → "Active"</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ USE CASES ═══════════════════ -->
+<section class="section" id="usecases">
+  <div class="container">
+    <div class="section-label">Use Cases</div>
+    <h2 class="section-title">Any recurring payment.<br/>Any chain.</h2>
+    <p class="section-sub">Cadence is currency-agnostic and chain-agnostic. If it recurs, it runs on Cadence.</p>
+
+    <div class="use-cases-grid reveal">
+      <div class="use-case">
+        <div class="use-case-icon">🔧</div>
+        <h4>Onchain SaaS</h4>
+        <p>Monthly API access, RPC nodes, developer tools — billed in USDT or ETH, collected automatically, no invoices.</p>
+      </div>
+      <div class="use-case">
+        <div class="use-case-icon">🏛</div>
+        <h4>DAO Membership</h4>
+        <p>Recurring dues for governance rights, token-gated access, or community benefits. Auto-cancel on non-payment.</p>
+      </div>
+      <div class="use-case">
+        <div class="use-case-icon">✍️</div>
+        <h4>Content Monetization</h4>
+        <p>Newsletters, research, media — subscription-based monetization for creators without a payment processor.</p>
+      </div>
+      <div class="use-case">
+        <div class="use-case-icon">🤖</div>
+        <h4>AI Agent Economy</h4>
+        <p>Agents paying agents — recurring micropayments between autonomous systems, fully onchain and permissionless.</p>
+      </div>
+      <div class="use-case">
+        <div class="use-case-icon">🏪</div>
+        <h4>Onchain Commerce</h4>
+        <p>Box subscriptions, physical goods, recurring orders — managed natively in crypto for merchants on Shopify or custom storefronts.</p>
+      </div>
+      <div class="use-case">
+        <div class="use-case-icon">🌐</div>
+        <h4>Infrastructure Access</h4>
+        <p>Streaming subscriptions for indexers, oracles, bridges — pay-as-you-subscribe for onchain infrastructure providers.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ WHY NOW ═══════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">Why Now</div>
+    <h2 class="section-title">The window is open.<br/>It won't stay open long.</h2>
+    <p class="section-sub">Five converging forces make 2026 the exact moment to standardize onchain subscriptions.</p>
+
+    <div class="why-now-grid reveal">
+      <div class="why-card">
+        <div class="why-year">2024–2025</div>
+        <h4>Stripe re-enters crypto</h4>
+        <p>Stripe relaunched crypto payments in 2024 and is actively building onchain payment rails. When Stripe integrates a subscription standard, it will move the entire merchant ecosystem with it.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-year">2025–2026</div>
+        <h4>Base reaches critical mass</h4>
+        <p>Coinbase's Base chain has crossed meaningful TVL and daily active user thresholds. A subscription standard deployed on Base has immediate access to a distribution network of millions of Coinbase users.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-year">2026</div>
+        <h4>AI agents need payment rails</h4>
+        <p>Autonomous AI agents are increasingly executing tasks that require recurring micropayments — to each other and to services. Onchain subscriptions are the native payment primitive for the agentic economy.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-year">Now</div>
+        <h4>Stablecoin infrastructure matures</h4>
+        <p>USDT and USDC liquidity is now deep and reliable across all major EVM chains. Merchants can accept stablecoin subscriptions without meaningful exchange rate or liquidity risk for the first time.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-year">Now</div>
+        <h4>No incumbent standard exists</h4>
+        <p>The two prior attempts (ERC-1337, ERC-5643) have both failed or been abandoned. The standard-setting race is still open. The first well-implemented, well-adopted ERC wins by default.</p>
+      </div>
+      <div class="why-card">
+        <div class="why-year">2026–2027</div>
+        <h4>TradFi moves to crypto rails</h4>
+        <p>Major financial institutions are actively exploring onchain settlement. A subscription standard today becomes the infrastructure they adopt tomorrow — the same way ERC-20 became the default for tokenized assets.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ VOLUME FLOW ═══════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">Revenue Model</div>
+    <h2 class="section-title">Every payment is a transaction.<br/>Every transaction generates value.</h2>
+    <p class="section-sub">Cadence captures value at the protocol level on every collected payment — while generating compounding stablecoin volume for the tokens it runs on.</p>
+
+    <div class="flow-wrap reveal">
+      <div class="flow-title">Payment flow — from subscriber to merchant</div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-icon">👤</div>
+          <div class="flow-step-label">Subscriber</div>
+          <div class="flow-step-sub">Holds USDT</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-icon highlight">⬡</div>
+          <div class="flow-step-label">Cadence Protocol</div>
+          <div class="flow-step-sub">collectPayment()</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-icon">🏪</div>
+          <div class="flow-step-label">Merchant</div>
+          <div class="flow-step-sub">Receives USDT</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-icon">💰</div>
+          <div class="flow-step-label">Protocol Fee</div>
+          <div class="flow-step-sub">0.25% retained</div>
+        </div>
+      </div>
+      <div class="flow-bottom">
+        <div class="flow-metric">
+          <div class="flow-metric-value">$10M</div>
+          <div class="flow-metric-label">Monthly volume → $25K/mo protocol revenue</div>
+        </div>
+        <div class="flow-metric">
+          <div class="flow-metric-value">$100M</div>
+          <div class="flow-metric-label">Monthly volume → $250K/mo protocol revenue</div>
+        </div>
+        <div class="flow-metric">
+          <div class="flow-metric-value">$1B</div>
+          <div class="flow-metric-label">Monthly volume → $2.5M/mo protocol revenue</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ PARTNERS CTA ═══════════════════ -->
+<section class="section" id="partners">
+  <div class="container">
+    <div class="partners-section reveal">
+      <div class="section-label" style="justify-content:center;margin-bottom:24px;">For Partners &amp; Investors</div>
+      <h2>Building the rails for the subscription economy.</h2>
+      <p>We're looking for strategic partners who understand the infrastructure opportunity — stablecoin issuers, chain ecosystems, and fintech investors who want early positioning in the onchain subscription standard.</p>
+      <div class="partners-ctas">
+        <a href="mailto:info@cadenceprotocol.build?subject=Cadence Protocol — Partnership Inquiry" class="btn-primary">Get in touch</a>
+        <a href="cadence-onepager.pdf" class="btn-ghost" target="_blank">Download one-pager</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ ROADMAP ═══════════════════ -->
+<section class="section" id="roadmap">
+  <div class="container">
+    <div class="section-label">Roadmap</div>
+    <h2 class="section-title">Where we are.<br/>Where we're going.</h2>
+
+    <div class="timeline reveal">
+      <div class="timeline-item active">
+        <div class="tl-badge now">Now — Q1 2026</div>
+        <div class="tl-title">Foundation</div>
+        <div class="tl-items">
+          <div class="tl-item">ERC interface design + rationale</div>
+          <div class="tl-item">Reference implementation (Foundry)</div>
+          <div class="tl-item">Ethereum Magicians discussion open</div>
+          <div class="tl-item">Testnet deployment (Sepolia + Base Sepolia)</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="tl-badge soon">Q2 2026</div>
+        <div class="tl-title">Standard & Product</div>
+        <div class="tl-items">
+          <div class="tl-item">ERC submission + number assigned</div>
+          <div class="tl-item">cadenceprotocol.build site live</div>
+          <div class="tl-item">Automation Service beta (first merchants)</div>
+          <div class="tl-item">SDK on NPM + public subgraph</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="tl-badge later">Q3–Q4 2026</div>
+        <div class="tl-title">Security & Scale</div>
+        <div class="tl-items">
+          <div class="tl-item">Formal security audit (Sherlock / Code4rena)</div>
+          <div class="tl-item">Mainnet launch across 5 chains</div>
+          <div class="tl-item">Immunefi bug bounty program</div>
+          <div class="tl-item">Ecosystem grants + early adopter integrations</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-logo">
+          <img src="logo/cadence_logo_white_hor.png" alt="Cadence Protocol" />
+        </div>
+        <div class="footer-socials" style="margin-top:16px;">
+          <a href="#" title="GitHub">
+            <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+          </a>
+          <a href="#" title="X / Twitter">
+            <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <a href="#" title="Farcaster">
+            <svg viewBox="0 0 24 24"><path d="M11.543 0h.914C17.95 0 22 4.05 22 9.543v4.914C22 19.95 17.95 24 12.457 24h-.914C6.05 24 2 19.95 2 14.457V9.543C2 4.05 6.05 0 11.543 0ZM8 6l4 6 4-6h-2l-2 3-2-3H8Zm-1 7v5h2v-4h6v4h2v-5H7Z"/></svg>
+          </a>
+          <a href="#" title="Discord">
+            <svg viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="#problem">Problem</a>
+        <a href="#infrastructure">Docs</a>
+        <a href="https://github.com" target="_blank">GitHub</a>
+        <a href="https://ethereum-magicians.org" target="_blank">EIP Discussion</a>
+      </div>
+      <div class="footer-right">
+        <div class="footer-ens">cadenceprotocol.eth</div>
+        <div class="footer-copy">cadenceprotocol.build · © 2026 Cadence Protocol</div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── HERO INTERACTIVE CANVAS ──────────────────────────
+  (function () {
+    const canvas = document.getElementById('hero-canvas');
+    const ctx    = canvas.getContext('2d');
+    const hero   = document.querySelector('.hero');
+
+    let W = 0, H = 0;
+    let mouseX = -9999, mouseY = -9999;
+    let glowX  = -9999, glowY  = -9999;
+    let particles = [];
+    const COUNT = 80;
+
+    function resize() {
+      const rect = hero.getBoundingClientRect();
+      W = canvas.width  = hero.offsetWidth;
+      H = canvas.height = hero.offsetHeight;
+    }
+
+    class Particle {
+      constructor() { this.init(true); }
+      init(scatter) {
+        this.x  = scatter ? Math.random() * W : (Math.random() < 0.5 ? -5 : W + 5);
+        this.y  = Math.random() * H;
+        this.r  = Math.random() * 2 + 1;        // 1–3px — visible
+        this.vx = (Math.random() - 0.5) * 0.4;
+        this.vy = (Math.random() - 0.5) * 0.4;
+        this.baseAlpha = Math.random() * 0.45 + 0.25;  // 0.25–0.70 — clearly visible
+        this.a  = this.baseAlpha;
+        this.hue = Math.random() > 0.55 ? '129,140,248' : '96,165,250';
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Mouse repulsion
+        const dx = this.x - mouseX;
+        const dy = this.y - mouseY;
+        const d2 = dx * dx + dy * dy;
+        const R  = 160;
+        if (d2 < R * R && d2 > 0.01) {
+          const d    = Math.sqrt(d2);
+          const push = ((R - d) / R) * 2.5;
+          this.x += (dx / d) * push;
+          this.y += (dy / d) * push;
+          // Brighten near mouse
+          this.a = Math.min(1, this.baseAlpha + (1 - d / R) * 0.4);
+        } else {
+          this.a += (this.baseAlpha - this.a) * 0.05;
+        }
+
+        // Wrap edges
+        if (this.x < -5)  this.x = W + 5;
+        if (this.x > W+5) this.x = -5;
+        if (this.y < -5)  this.y = H + 5;
+        if (this.y > H+5) this.y = -5;
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${this.hue},${this.a.toFixed(2)})`;
+        ctx.fill();
+      }
+    }
+
+    function init() {
+      particles = [];
+      for (let i = 0; i < COUNT; i++) particles.push(new Particle());
+    }
+
+    function drawConnections() {
+      const LINK = 110;
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const d  = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK) {
+            const alpha = (1 - d / LINK) * 0.28;  // max 28% — visible
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(96,165,250,${alpha.toFixed(2)})`;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    function drawMouseGlow() {
+      if (glowX < -500) return;
+      glowX += (mouseX - glowX) * 0.07;
+      glowY += (mouseY - glowY) * 0.07;
+      const g = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 300);
+      g.addColorStop(0,    'rgba(37,99,235,0.18)');
+      g.addColorStop(0.4,  'rgba(99,102,241,0.08)');
+      g.addColorStop(1,    'rgba(37,99,235,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    function frame() {
+      ctx.clearRect(0, 0, W, H);
+      drawMouseGlow();
+      drawConnections();
+      particles.forEach(p => { p.update(); p.draw(); });
+      requestAnimationFrame(frame);
+    }
+
+    // Track mouse on the whole document when inside hero bounds
+    document.addEventListener('mousemove', e => {
+      const r = hero.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top  && e.clientY <= r.bottom) {
+        mouseX = e.clientX - r.left;
+        mouseY = e.clientY - r.top;
+        if (glowX < -500) { glowX = mouseX; glowY = mouseY; }
+      } else {
+        mouseX = -9999; mouseY = -9999;
+      }
+    });
+
+    window.addEventListener('resize', () => { resize(); init(); }, { passive: true });
+
+    // Ensure hero is fully laid out before measuring
+    requestAnimationFrame(() => {
+      resize();
+      init();
+      frame();
+    });
+  })();
+
+  // Simple waitlist form feedback
+  const form = document.querySelector('.waitlist-form');
+  const btn = form.querySelector('button');
+  const input = form.querySelector('input');
+  btn.addEventListener('click', () => {
+    if (!input.value || !input.value.includes('@')) {
+      input.style.borderColor = '#F87171';
+      setTimeout(() => input.style.borderColor = '', 1500);
+      return;
+    }
+    btn.textContent = '✓ You\'re on the list';
+    btn.style.background = '#16A34A';
+    input.disabled = true;
+    btn.disabled = true;
+  });
+
+  // Scroll reveal
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+  // Nav scroll state
+  window.addEventListener('scroll', () => {
+    document.querySelector('nav').classList.toggle('scrolled', window.scrollY > 20);
+  }, { passive: true });
+
+  // Smooth nav highlight on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 100) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.style.color = a.getAttribute('href') === '#' + current
+        ? 'var(--text)'
+        : 'var(--text2)';
+    });
+  });
+</script>
+
+</body>
+</html>
