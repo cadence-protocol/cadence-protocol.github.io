@@ -689,6 +689,10 @@
     .tl-badge.now { background: rgba(37,99,235,0.15); color: var(--blue-ll); border: 1px solid rgba(37,99,235,0.3); }
     .tl-badge.soon { background: rgba(250,204,21,0.1); color: #FCD34D; border: 1px solid rgba(250,204,21,0.2); }
     .tl-badge.later { background: rgba(100,116,139,0.1); color: var(--text3); border: 1px solid var(--border); }
+    .tl-badge.done { background: rgba(16,185,129,0.1); color: #34D399; border: 1px solid rgba(16,185,129,0.2); }
+    .tl-item.wip { color: var(--text) !important; }
+    .tl-item.wip::before { content: '⚙'; color: #FCD34D; animation: spin 3s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     /* ── STATS BAR ─────────────────────────────────────── */
     .stats-bar {
@@ -1725,29 +1729,37 @@
     <h2 class="section-title">Where we are.<br/>Where we're going.</h2>
 
     <div class="timeline reveal">
-      <div class="timeline-item active">
-        <div class="tl-badge now">Now — Q1 2026</div>
-        <div class="tl-title">Foundation</div>
+      <div class="timeline-item">
+        <div class="tl-badge done">✓ Q4 2025 – Q1 2026</div>
+        <div class="tl-title">Phase 1 — Foundation</div>
         <div class="tl-items">
           <div class="tl-item" style="color:var(--text);">✓ ERC interface design + rationale</div>
           <div class="tl-item" style="color:var(--text);">✓ Reference implementation (Foundry, 94 tests, 100% coverage)</div>
           <div class="tl-item" style="color:var(--text);">✓ <a href="https://ethereum-magicians.org/t/erc-8191-onchain-recurring-payments/27946" target="_blank" style="color:var(--blue-ll);text-decoration:none;">Ethereum Magicians discussion open</a></div>
           <div class="tl-item" style="color:var(--text);">✓ <a href="https://github.com/ethereum/ERCs/pull/1595" target="_blank" style="color:var(--blue-ll);text-decoration:none;">ERC-8191 submitted and number assigned</a></div>
+        </div>
+      </div>
+      <div class="timeline-item active">
+        <div class="tl-badge now">Now — Q1–Q2 2026</div>
+        <div class="tl-title">Phase 2 — Infrastructure</div>
+        <div class="tl-items">
           <div class="tl-item" style="color:var(--text);">✓ Sepolia testnet — <a href="https://sepolia.etherscan.io/address/0x9Ff8f7493bE5Afbd7b5Ff7a5DC6df73b33BeC128" target="_blank" style="color:var(--blue-ll);text-decoration:none;">KeeperRegistry</a> · <a href="https://sepolia.etherscan.io/address/0xe828dE73B289be1FaE1f54Dd64Faeb24C04F4b33" target="_blank" style="color:var(--blue-ll);text-decoration:none;">SubscriptionManager</a></div>
           <div class="tl-item" style="color:var(--text);">✓ <a href="https://cadenceprotocol.build" target="_blank" style="color:var(--blue-ll);text-decoration:none;">cadenceprotocol.build</a> live</div>
+          <div class="tl-item wip">Automation Service alpha — keeper bot + on-chain collection</div>
         </div>
       </div>
       <div class="timeline-item">
-        <div class="tl-badge soon">Q2 2026</div>
-        <div class="tl-title">Standard & Product</div>
+        <div class="tl-badge soon">Q2–Q3 2026</div>
+        <div class="tl-title">Phase 3 — Standard & Product</div>
         <div class="tl-items">
           <div class="tl-item">Automation Service beta (first merchants)</div>
           <div class="tl-item">SDK on NPM + public subgraph</div>
+          <div class="tl-item">ERC-8191 finalization</div>
         </div>
       </div>
       <div class="timeline-item">
         <div class="tl-badge later">Q3–Q4 2026</div>
-        <div class="tl-title">Security & Scale</div>
+        <div class="tl-title">Phase 4 — Security & Scale</div>
         <div class="tl-items">
           <div class="tl-item">Formal security audit (Sherlock / Code4rena)</div>
           <div class="tl-item">Mainnet launch across 5 chains</div>
